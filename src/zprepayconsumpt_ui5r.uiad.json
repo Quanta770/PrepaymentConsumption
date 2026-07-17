@@ -1,0 +1,35 @@
+{
+  "formatVersion": "2",
+  "header": {
+    "description": "Prepayment Consumption",
+    "originalLanguage": "en",
+    "abapLanguageVersion": "cloudDevelopment"
+  },
+  "generalInformation": {
+    "appType": "ui5",
+    "catalogId": "SAP_TC_UI5_REPO_UIAD",
+    "targetMappingTitle": "Prepayment Consumption"
+  },
+  "ui5AppDetails": {
+    "appId": "com.zprepaymentconsumption"
+  },
+  "navigation": {
+    "targetMappingId": "UI5R_40AE07099CFF371AECBC310B88C44B65D729C47C_TM",
+    "semanticObject": "zprepaymentconsumption",
+    "action": "upload",
+    "desktop": true,
+    "tablet": true,
+    "phone": true
+  },
+  "tiles": [
+    {
+      "id": "UI5R_40AE07099CFF371AECBC310B88C44B65D729C47C_AL",
+      "tileType": "static",
+      "isDefault": true,
+      "standard": {
+        "title": "Prepayment Consumption",
+        "icon": "sap-icon://documents"
+      }
+    }
+  ]
+}

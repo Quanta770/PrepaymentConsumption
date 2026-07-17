@@ -1,0 +1,35 @@
+CLASS zcl_delvso_coll DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+   INTERFACES: if_amdp_marker_hdb.
+    CLASS-METHODS: GET_DATA FOR TABLE FUNCTION ZI_COLLECTIONINV_AGGR.
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+
+CLASS ZCL_DELVSO_COLL IMPLEMENTATION.
+
+
+METHOD GET_DATA
+    BY DATABASE FUNCTION FOR HDB
+    LANGUAGE SQLSCRIPT
+    OPTIONS READ-ONLY
+    USING ZI_DELIVSO_TO_PREPAYSO.
+
+    RETURN
+      SELECT
+       session_context('CLIENT') as rclnt,
+        DeliverySO,
+        DeliverySOItem,
+        BillingDocument,
+        STRING_AGG(accountingdocument, ',') AS AccDocList
+      FROM ZI_DELIVSO_TO_PREPAYSO
+      GROUP BY DeliverySO, DeliverySOItem,BillingDocument;
+
+  ENDMETHOD.
+ENDCLASS.

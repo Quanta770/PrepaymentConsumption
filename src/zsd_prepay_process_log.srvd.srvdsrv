@@ -1,0 +1,5 @@
+@EndUserText.label: 'SD for Prepayment Process Log'
+define service ZSD_PREPAY_PROCESS_LOG {
+  expose ZC_PREPAY_PROCESS_LOG  as ProcessLog;
+  expose ZC_PREPAY_PROCESS_STEP as ProcessStep;
+}

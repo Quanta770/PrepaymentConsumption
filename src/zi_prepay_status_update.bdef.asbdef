@@ -1,0 +1,41 @@
+managed implementation in class zbp_i_prepay_status_update unique;
+strict ( 2 );
+
+define behavior for ZI_PREPAY_STATUS_UPDATE //alias <alias_name>
+persistent table ztb_prepy_status
+lock master
+authorization master ( instance )
+//etag master <field_name>
+{
+  create ;
+  update;
+  delete;
+  field ( numbering : managed, readonly ) SapUuid;
+  field ( readonly ) Lastchangedby;
+  mapping for ztb_prepy_status
+  {
+     SapUuid =  sap_uuid ;
+     PrepaySalesorder = prepayso ;
+     PrepaySalesorderitem = prepaysoitem ;
+     DelvSalesorder = delvso;
+     DelvSalesorderitem = delvsoitem;
+     Billingplanitem = billingplanitem ;
+     Socurrency = socurrency   ;
+     Appliedamount = appliedamount;
+     AccountingDocument = accountingdocument;
+     CompanyCode = companycode;
+     IOType = iotype;
+     Scenario = scenario;
+     FiscalYear = fiscalyear;
+     Isjeposted = isjeposted     ;
+     Isbillingplanposted = isbillingplanposted   ;
+     Isconsumptiontableupdated = isconsumptiontableupdated;
+     ReversalFlag = reversalflag;
+     WriteoffFlag = writeoffflag;
+     Message = message;
+     Changedatetime  = changedatetime ;
+     Lastchangedby = lastchangedby   ;
+
+
+  }
+}

@@ -1,0 +1,51 @@
+managed implementation in class zbp_i_prepayment_updates unique;
+strict ( 2 );
+
+define behavior for ZI_Prepayment_Updates alias PrepaymentUpdates
+persistent table ztb_prepayment_c
+lock master
+authorization master ( instance )
+//etag master <field_name>
+{
+  create;
+  update;
+  delete;
+  //field ( readonly ) Delvsosalesdocument, Delvsosalesdocumentitem, Changedatetime, PrepaymentrequestD, PrepaymentrequestP;
+  field ( numbering : managed, readonly ) sap_uuid;
+  action updateDeliveryPrepayNum result [1] $self;
+  action testPrepayModification parameter zst_billingplan result [1] $self;
+
+  action postBillingPlan parameter zst_billingplan result [1] $self;
+  action reverseBillingPlan parameter zst_billingplan_reverse result [1] $self;
+
+  mapping for ztb_prepayment_c
+    {
+      sap_uuid                = sap_uuid;
+      prepaymentrequestp      = prepaymentrequestp;
+      prepaymentSo            = prepaymentSo;
+      prepaymentSoItem        = prepaymentSoItem;
+      //        prepaymentSalesOrg             = prepaymentSalesOrg;
+      //        prepaymentSoldTo               = prepaymentSoldTo;
+      //        prepaymentScenarioPy           = prepaymentScenarioPy;
+      //        prepaymentSdItemCtgy           = prepaymentSdItemCtgy;
+      //        prepaymentCurrency             = prepaymentCurrency;
+      //        prepaymentGrossAmount          = prepaymentGrossAmount;
+      //        prepaymentCtrDwnPaymnt         = prepaymentCtrDwnPaymnt;
+      prepaymentrequestd      = prepaymentrequestd;
+      delvSoSalesDocument     = delvSoSalesDocument;
+      delvSoSalesDocumentItem = delvSoSalesDocumentItem;
+      //        delvSoSalesOrg                 = delvSoSalesOrg;
+      //        delvSoSoldTo                   = delvSoSoldTo;
+      //        Delvsoscenariopy                 = delvSoScenarioPy;
+      //        delvSoSdItmCtgy                = delvSoSdItmCtgy;
+      //        delvSoCurrency                 = delvSoCurrency;
+      //        Delsoamount                   = delSoAmount;
+      Changedatetime          = ChangeDateTime;
+      lastchangedby           = lastchangedby;
+      Status                  = Status;
+      Message                 = message;
+      sessionid               = sessionid;
+    }
+
+
+}

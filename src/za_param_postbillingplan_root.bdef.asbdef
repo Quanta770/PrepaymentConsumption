@@ -1,0 +1,11 @@
+abstract;
+strict ( 2 );
+with hierarchy;
+
+define behavior for ZA_PARAM_POSTBILLINGPLAN_ROOT alias PostBillingPlanRoot
+{
+  association _param;
+}
+define behavior for ZA_PARAM_POSTBILLINGPLAN_CHILD alias PostBillingPlanChild
+{
+}

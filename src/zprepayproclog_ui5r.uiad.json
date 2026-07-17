@@ -1,0 +1,34 @@
+{
+  "formatVersion": "2",
+  "header": {
+    "description": "Prepayment billing plan & JE posting log",
+    "originalLanguage": "en",
+    "abapLanguageVersion": "cloudDevelopment"
+  },
+  "generalInformation": {
+    "appType": "ui5",
+    "catalogId": "SAP_TC_UI5_REPO_UIAD",
+    "targetMappingTitle": "Prepayment Process Log"
+  },
+  "ui5AppDetails": {
+    "appId": "zprepayprocesslog"
+  },
+  "navigation": {
+    "targetMappingId": "UI5R_D469F07032CC5435BCF0B3337CBD7624580544FE_TM",
+    "semanticObject": "zprepayprocesslog",
+    "action": "display",
+    "desktop": true,
+    "tablet": true,
+    "phone": true
+  },
+  "tiles": [
+    {
+      "id": "UI5R_D469F07032CC5435BCF0B3337CBD7624580544FE_AL",
+      "tileType": "static",
+      "isDefault": true,
+      "standard": {
+        "title": "Prepayment Process Log"
+      }
+    }
+  ]
+}

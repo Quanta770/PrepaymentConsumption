@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DOMA" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD01V>
+    <DOMNAME>ZDO_PREPAY_LOG_FLOW_TYPE</DOMNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <DATATYPE>CHAR</DATATYPE>
+    <LENG>000008</LENG>
+    <OUTPUTLEN>000008</OUTPUTLEN>
+    <VALEXI>X</VALEXI>
+    <DDTEXT>Prepayment log flow type</DDTEXT>
+    <DOMMASTER>E</DOMMASTER>
+   </DD01V>
+   <DD07V_TAB>
+    <DD07V>
+     <DOMNAME>ZDO_PREPAY_LOG_FLOW_TYPE</DOMNAME>
+     <VALPOS>0001</VALPOS>
+     <DDLANGUAGE>E</DDLANGUAGE>
+     <DOMVALUE_L>BILLPLAN</DOMVALUE_L>
+     <DDTEXT>Billing plan HTTP steps</DDTEXT>
+    </DD07V>
+    <DD07V>
+     <DOMNAME>ZDO_PREPAY_LOG_FLOW_TYPE</DOMNAME>
+     <VALPOS>0002</VALPOS>
+     <DDLANGUAGE>E</DDLANGUAGE>
+     <DOMVALUE_L>JEPOST</DOMVALUE_L>
+     <DDTEXT>Journal entry posting</DDTEXT>
+    </DD07V>
+   </DD07V_TAB>
+  </asx:values>
+ </asx:abap>
+</abapGit>

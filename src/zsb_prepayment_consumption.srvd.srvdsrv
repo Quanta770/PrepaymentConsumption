@@ -1,0 +1,15 @@
+@EndUserText.label: 'Service Def'
+define service ZSB_PREPAYMENT_CONSUMPTION {
+  expose ZI_PREPAYMENT_DELIVERY_SO     as PrepaymentDeliverySo;
+  expose ZC_Prepayment_Updates         as PrepaymentUpdates;
+  expose ZC_PREPAYMENT_PREVIEW         as PrepaymentPreview;
+  expose ZI_PREPAYPOST_CUSTOM_ENT      as PrepayJournalPost;
+  expose ZC_CONSUMPTION_HISTORY        as Z_ConsumptionHistory;
+  expose ZC_PREPAY_STATUS_UPDATE       as PrepayStatusUpdate;
+  expose ZI_PREPAY_REVERSE_CUSTENT     as PrepayJournalReverse;
+  expose ZI_PREPAYMENT_DELIVERY_SO_KEY as PrepaymentDeliverySokey;
+  expose ZC_DELIVSO_TO_PREPAYSO        as PrepayDelvAccDoc;
+  expose ZC_PREPAY_DELV_SO_OPENIO      as PrepayDelvSoOpenio;
+  expose ZC_OPENIO_STAGING_ROWS        as OpenIOStagingRows;
+  expose ZV_OPENIO_PREVIEW             as OpenIOPreview;
+}

@@ -1,0 +1,49 @@
+managed implementation in class zbp_i_openio_staging_rows unique;
+strict ( 2 );
+
+define behavior for ZI_OPENIO_STAGING_ROWS alias OpenIOStaging
+persistent table ztb_openio_rows
+lock master
+authorization master ( instance )
+//etag master <field_name>
+{
+  create ( authorization : global );
+  update;
+  delete;
+  field ( numbering : managed, readonly ) SapUuid;
+  field ( mandatory ) SessionId;
+
+  action deleteSessionRows parameter ZA_CLEAR_SESSION_ROWS_PARAM result    [1] ZA_CLEAR_SESSION_ROWS_RESULT;
+
+  mapping for ztb_openio_rows
+    {
+      SapUuid                     = sap_uuid;
+      PrepaymentReqNumPrepayment  = prepaymentreqnumprepayment;
+
+      SessionId                   = session_id;
+      PrepaymentSo                = prepaymentso;
+      PrepaymentSoItem            = prepaymentsoitem;
+      PrepaymentSalesOrg          = prepaymentsalesorg;
+      PrepaymentSoldTo            = prepaymentsoldto;
+      PrepaymentScenarioPy        = prepaymentscenariopy;
+      PrepaymentCurrency          = prepaymentcurrency;
+
+      PrepaymentNetAmount         = prepaymentnetamount;
+      PrepaymentRemainingAmount   = prepaymentremainingamount;
+
+      PrepayDocDate               = prepaydocdate;
+
+      DelvSoSalesDocument         = delvsosalesdocument;
+      DelvSoSalesDocumentItem     = delvsosalesdocumentitem;
+      DelvSoSalesOrg              = delvsosalesorg;
+      DelvSoSoldTo                = delvsosoldto;
+      DelvSoScenario              = delvsoscenario;
+      DelvSoCurrency              = delvsocurrency;
+
+      DelvSoNetAmount             = delvsonetamount;
+      DelvRemainingAmount         = delvremainingamount;
+
+      DelvDocDate                 = delvdocdate;
+      CreatedOn                  = created_on;
+    }
+}

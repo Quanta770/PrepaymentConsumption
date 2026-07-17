@@ -1,0 +1,15 @@
+projection;
+strict ( 2 );
+
+define behavior for ZC_Prepayment_Updates alias PrepaymentUpdates
+{
+  use create;
+  use update;
+  use delete;
+
+  use action updateDeliveryPrepayNum;
+  use action testPrepayModification;
+  use action postBillingPlan;
+  use action reverseBillingPlan;
+
+}

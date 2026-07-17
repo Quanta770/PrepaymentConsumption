@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DDLS" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DDLS>
+    <DDLNAME>ZI_PREPAY_SO_OPEN_AMT</DDLNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <DDTEXT>Sum of open amount for prepayment sales order</DDTEXT>
+    <SOURCE_TYPE>W</SOURCE_TYPE>
+   </DDLS>
+  </asx:values>
+ </asx:abap>
+</abapGit>

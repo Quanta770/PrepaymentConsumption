@@ -1,0 +1,31 @@
+managed implementation in class zbp_i_prepayment_preview unique ;
+strict ( 2 );
+
+define behavior for ZI_PREPAYMENT_PREVIEW alias PrepaymentPreview
+persistent table ztb_prepay_prev with additional save
+lock master
+authorization master ( instance )
+//etag master <field_name>
+{
+  create;
+  update;
+  delete;
+  field ( readonly ) journalentry, journalitem;
+  action PrepayPreview parameter zstprepay_prev_params result [1..*] ZI_PREVIEW_RESULT;
+  static action processJsonFile parameter ZAE_JsonPayload;
+
+  mapping for ztb_prepay_prev
+  {
+     journalentry = journalentry;
+     journalitem = journalitem;
+     salesorder = salesorder;
+     glaccount = glaccount;
+     accountname = accountname;
+     debit = debit;
+     credit = credit;
+     currencycd = currencycd;
+     wbselement = wbselement;
+     writeoff = writeoff;
+
+  }
+}

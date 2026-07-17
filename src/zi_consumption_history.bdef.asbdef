@@ -1,0 +1,34 @@
+managed implementation in class zbp_i_consumption_history unique;
+strict ( 2 );
+
+define behavior for ZI_CONSUMPTION_HISTORY //alias <alias_name>
+persistent table ztb_consume_hist
+lock master
+authorization master ( instance )
+//etag master <field_name>
+{
+  //create ( authorization : global );
+  create;
+  update;
+  delete;
+  //field ( readonly ) SapUuid, Salesorder, Salesorderitem;
+
+   field ( numbering : managed, readonly ) SapUuid;
+   field ( readonly ) Lastchangedby;
+   mapping for ztb_consume_hist
+    {
+         Billingplanitem = billingplanitem;
+         Changedatetime = changedatetime;
+         Lastchangedby = lastchangedby;
+         Salesorder = salesorder;
+         Salesorderitem = salesorderitem;
+         SapUuid = sap_uuid;
+         Soamount = soamount;
+         Socurrency = socurrency;
+         Prepaymentreqnumber = prepaymentreqnum;
+         Sotype = sotype;
+         IOType = iotype;
+         Openamount = openamount;
+    }
+
+}
