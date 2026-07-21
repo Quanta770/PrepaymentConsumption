@@ -129,10 +129,24 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
         ENDIF.
 
         GET TIME STAMP FIELD ls_log-logged_at.
-        ls_log-logged_by = cl_abap_context_info=>get_user_technical_name( ).
-
-        INSERT ztb_prepay_log FROM @ls_log.
-
+        MODIFY ENTITIES OF zi_prepay_log_write
+          ENTITY PrepayLogWrite
+            CREATE FIELDS ( LogId CorrelationId FlowType StepSeq StepName HttpMethod
+                             HttpStatus Uri ResponseBody LoggedAt LoggedBy )
+            WITH VALUE #( ( %cid           = 'PREPAYLOGSTEP'
+                             LogId          = ls_log-log_id
+                             CorrelationId  = iv_correlation_id
+                             FlowType       = iv_flow_type
+                             StepSeq        = iv_step_seq
+                             StepName       = ls_log-step_name
+                             HttpMethod     = ls_log-http_method
+                             HttpStatus     = ls_log-http_status
+                             Uri            = ls_log-uri
+                             ResponseBody   = ls_log-response_body
+                             LoggedAt       = ls_log-logged_at
+                             LoggedBy       = cl_abap_context_info=>get_user_technical_name( ) ) )
+          FAILED   DATA(ls_failed)
+          REPORTED DATA(ls_reported).
       CATCH cx_root.
         " Logging must never break the actual business action.
     ENDTRY.
@@ -146,12 +160,16 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
         DATA(lv_message) = substring( val = iv_message_text off = 0
                               len = nmin( val1 = strlen( iv_message_text ) val2 = 1000 ) ).
 
-       UPDATE ztb_prepay_log
-           SET status              = @iv_status,
-               message_text        = @lv_message,
-               accounting_document = @iv_accounting_document,
-               fiscal_year         = @iv_fiscal_year
-         WHERE log_id = @iv_log_id.
+       MODIFY ENTITIES OF zi_prepay_log_write
+          ENTITY PrepayLogWrite
+            UPDATE FIELDS ( Status MessageText AccountingDocument FiscalYear )
+            WITH VALUE #( ( LogId              = iv_log_id
+                             Status             = iv_status
+                             MessageText        = lv_message
+                             AccountingDocument = iv_accounting_document
+                             FiscalYear         = iv_fiscal_year ) )
+          FAILED   DATA(ls_failed)
+          REPORTED DATA(ls_reported).
 
       CATCH cx_root.
         " Logging must never break the actual business action.
