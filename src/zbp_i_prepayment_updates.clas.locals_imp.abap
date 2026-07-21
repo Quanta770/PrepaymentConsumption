@@ -349,6 +349,14 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
       lv_io_type = ls_key-%param-param_io_type.
     ENDLOOP.
 
+    DATA(lv_log_id) = zcl_prepay_log=>start_process(
+      iv_flow_type          = 'BILLPLAN'
+      iv_delivery_so        = so_number
+      iv_delivery_so_item   = so_item
+      iv_prepayment_so      = lv_prepay_so
+      iv_prepayment_so_item = lv_prepay_so_item ).
+    DATA lv_step_seq TYPE i VALUE 0.
+
     DATA lv_status     TYPE i.
 
     DATA lv_csrf_token TYPE string.
@@ -416,6 +424,16 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
                   ENDLOOP.
                   "Prepayment Remaining Amount is Prepay Net Amt - Total Consumed
                   lv_prepay_remaining_amt = lv_prepay_net - lv_total_amt.
+
+                  lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'PREPAY_REMAINING_AMT'
+                  iv_is_error       = xsdbool( lv_prepay_remaining_amt IS INITIAL )
+                  iv_response_body  = |Prepay Remaining Amt: { lv_prepay_remaining_amt }| ).
+
             ENDIF.
          ENDIF.
     ENDIF.
@@ -471,14 +489,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
         ENDLOOP.
 *        lv_session   = lo_response->get_header_field( 'set-cookie' ).
 
-        "Debug
-        DATA(lv_body_debug1)   = lo_request->get_text( ).
-        DATA(lt_headers_debug1) = lo_request->get_header_fields( ).
-        DATA(lv_method_debug1) = lo_request->get_method( ).
-        DATA(lv_res_debug1) = lo_response->get_text( ).
-        DATA(lt_res_headers1) = lo_response->get_header_fields( ).
-        DATA(lv_path_debug1) = lo_request->get_header_field( i_name = '~request_uri' ).
-        "end debug
+        lv_step_seq = lv_step_seq + 1.
+        zcl_prepay_log=>log_step(
+          iv_correlation_id = lv_log_id
+          iv_flow_type      = 'BILLPLAN'
+          iv_step_seq       = lv_step_seq
+          iv_step_name      = 'GET_BILLING_PLAN'
+          iv_http_method    = 'GET'
+          iv_http_status    = http_status
+          iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+          iv_response_body  = lo_response->get_text( ) ).
+
+        IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+          zcl_prepay_log=>finish_process(
+            iv_log_id       = lv_log_id
+            iv_status       = 'E'
+            iv_message_text = |Step GET_BILLING_PLAN failed with HTTP { http_status }| ).
+
+          APPEND VALUE #(
+              %tky = ls_key-%tky
+              %msg = new_message_with_text(
+                       severity = if_abap_behv_message=>severity-error
+                       text     = |Billing plan posting failed at step GET_BILLING_PLAN (HTTP { http_status }). Ref: { lv_log_id }|
+                     )
+            ) TO reported-prepaymentupdates.
+
+          RETURN.
+        ENDIF.
 
         "--------- Parse Response-------------
         lv_response_body = lo_response->get_text(  ).
@@ -515,6 +552,15 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
             INTO TABLE @DATA(lt_rounding).
 
            lv_threshold_amt = VALUE #( lt_rounding[ value1 = lv_salesorg ]-value2 OPTIONAL ).
+
+           lv_step_seq = lv_step_seq + 1.
+            zcl_prepay_log=>log_step(
+              iv_correlation_id = lv_log_id
+              iv_flow_type      = 'BILLPLAN'
+              iv_step_seq       = lv_step_seq
+              iv_step_name      = 'LOOKUP_ROUNDING_THRESHOLD'
+              iv_is_error       = xsdbool( lv_threshold_amt IS INITIAL )
+              iv_response_body  = |Sales org { lv_salesorg }: threshold { lv_threshold_amt }| ).
         ENDIF.
         "--------------- GET CONFIG VALUE ----------------------
         "--- STEP 1.2: Get Net Amount of Delivery SO ---
@@ -551,11 +597,32 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
 
         "--------- End Parse Response---------
-        "--------- Check Currency ---------
+         "--------- Check Currency ---------
         IF lv_so_currency NE lv_currency.
+          lv_step_seq = lv_step_seq + 1.
+          zcl_prepay_log=>log_step(
+            iv_correlation_id = lv_log_id
+            iv_flow_type      = 'BILLPLAN'
+            iv_step_seq       = lv_step_seq
+            iv_step_name      = 'CHECK_CURRENCY'
+            iv_is_error       = abap_true
+            iv_response_body  = |SO currency { lv_so_currency } does not match requested currency { lv_currency }| ).
+
+          zcl_prepay_log=>finish_process(
+            iv_log_id       = lv_log_id
+            iv_status       = 'E'
+            iv_message_text = |Currency mismatch: SO is { lv_so_currency }, requested { lv_currency }| ).
+
+          APPEND VALUE #(
+              %tky = ls_key-%tky
+              %msg = new_message_with_text(
+                       severity = if_abap_behv_message=>severity-error
+                       text     = |Currency mismatch: SO is { lv_so_currency }, requested { lv_currency } (ref: { lv_log_id })|
+                     )
+            ) TO reported-prepaymentupdates.
+
           RETURN.
         ENDIF.
-
         "--------- End Check Currency ---------
 
         "--------- IF NO BILLING PLAN ---------
@@ -602,14 +669,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
               http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
-              "Debug
-              DATA(lv_body_debug2)   = lo_request->get_text( ).
-              DATA(lt_headers_debug2) = lo_request->get_header_fields( ).
-              DATA(lv_method_debug2) = lo_request->get_method( ).
-              DATA(lv_res_debug2) = lo_response->get_text( ).
-              DATA(lt_res_headers2) = lo_response->get_header_fields( ).
-              DATA(lv_path_debug2) = lo_request->get_header_field( i_name = '~request_uri' ).
-              "end debug
+              lv_step_seq = lv_step_seq + 1.
+            zcl_prepay_log=>log_step(
+              iv_correlation_id = lv_log_id
+              iv_flow_type      = 'BILLPLAN'
+              iv_step_seq       = lv_step_seq
+              iv_step_name      = 'UPDATE_ITEM_CATEGORY'
+              iv_http_method    = 'PATCH'
+              iv_http_status    = http_status
+              iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+              iv_response_body  = lo_response->get_text( ) ).
+
+            IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+              zcl_prepay_log=>finish_process(
+                iv_log_id       = lv_log_id
+                iv_status       = 'E'
+                iv_message_text = |Step UPDATE_ITEM_CATEGORY failed with HTTP { http_status }| ).
+
+              APPEND VALUE #(
+                  %tky = ls_key-%tky
+                  %msg = new_message_with_text(
+                           severity = if_abap_behv_message=>severity-error
+                           text     = |Billing plan posting failed at step UPDATE_ITEM_CATEGORY (HTTP { http_status }). Ref: { lv_log_id }|
+                         )
+                ) TO reported-prepaymentupdates.
+
+              RETURN.
+            ENDIF.
 
               "--- STEP 3: Create Empty Billing Plan ---
 
@@ -643,14 +729,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
               http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
-              "Debug
-              DATA(lv_body_debug3)   = lo_request->get_text( ).
-              DATA(lt_headers_debug3) = lo_request->get_header_fields( ).
-              DATA(lv_method_debug3) = lo_request->get_method( ).
-              DATA(lv_res_debug3) = lo_response->get_text( ).
-              DATA(lt_res_headers3) = lo_response->get_header_fields( ).
-              DATA(lv_path_debug3) = lo_request->get_header_field( i_name = '~request_uri' ).
-              "end debug
+              lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'CREATE_BILLING_PLAN'
+                  iv_http_method    = 'POST'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
+
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step CREATE_BILLING_PLAN failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step CREATE_BILLING_PLAN (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
 
               "--- STEP 4: Fetch billing plan number of new billing plan ---
 
@@ -697,6 +802,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
               lo_response = lo_http_client->execute( i_method = if_web_http_client=>patch ).
               http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
+              lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'UPDATE_PREPAY_DELV_FLAG'
+                  iv_http_method    = 'PATCH'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
+
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step UPDATE_PREPAY_DELV_FLAG failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step UPDATE_PREPAY_DELV_FLAG (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
+
               lo_request->delete_header_field( 'If-Match' ).
 
                " -------------- END Add IsprepaymentDelveryForm flag-----------------
@@ -738,6 +871,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
 
                   http_status = lv_status = lo_response->get_header_field( '~status_code' ).
+
+                  lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'UPDATE_CUSTOMER_GROUP'
+                  iv_http_method    = 'PATCH'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
+
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step UPDATE_CUSTOMER_GROUP failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step UPDATE_CUSTOMER_GROUP (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
 
                 ENDIF.
 
@@ -851,10 +1012,24 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
         lv_remainder_amt = lv_so_net_amt - ( lv_consumption_amt + lv_billing_plan_consumed_total ).
 
         IF lv_remainder_amt < 0.
+          lv_step_seq = lv_step_seq + 1.
+          zcl_prepay_log=>log_step(
+            iv_correlation_id = lv_log_id
+            iv_flow_type      = 'BILLPLAN'
+            iv_step_seq       = lv_step_seq
+            iv_step_name      = 'CHECK_REMAINDER_AMOUNT'
+            iv_is_error       = abap_true
+            iv_response_body  = |Remainder amount { lv_remainder_amt } is negative — amount to apply exceeds remaining amount| ).
+
+          zcl_prepay_log=>finish_process(
+            iv_log_id       = lv_log_id
+            iv_status       = 'E'
+            iv_message_text = 'Amount to apply bigger than remaining amount' ).
+
           APPEND VALUE #(
               %msg = new_message_with_text(
                        severity = if_abap_behv_message=>severity-error
-                       text     = 'Amount to apply bigger than remaining amount'
+                       text     = |Amount to apply bigger than remaining amount (ref: { lv_log_id })|
                      )
             ) TO reported-prepaymentupdates.
 
@@ -911,15 +1086,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
         http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
-        "Debug
-        DATA(lv_body_debug6)   = lo_request->get_text( ).
-        DATA(lt_headers_debug6) = lo_request->get_header_fields( ).
-        DATA(lv_method_debug6) = lo_request->get_method( ).
-        DATA(lv_res_debug6) = lo_response->get_text( ).
-        DATA(lt_res_headers6) = lo_response->get_header_fields( ).
-        DATA(lv_path_debug6) = lo_request->get_header_field( i_name = '~request_uri' ).
+         lv_step_seq = lv_step_seq + 1.
+        zcl_prepay_log=>log_step(
+          iv_correlation_id = lv_log_id
+          iv_flow_type      = 'BILLPLAN'
+          iv_step_seq       = lv_step_seq
+          iv_step_name      = 'CREATE_CONSUMPTION_LINE'
+          iv_http_method    = 'POST'
+          iv_http_status    = http_status
+          iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+          iv_response_body  = lo_response->get_text( ) ).
 
-        "end debug
+        IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+          zcl_prepay_log=>finish_process(
+            iv_log_id       = lv_log_id
+            iv_status       = 'E'
+            iv_message_text = |Step CREATE_CONSUMPTION_LINE failed with HTTP { http_status }| ).
+
+          APPEND VALUE #(
+              %tky = ls_key-%tky
+              %msg = new_message_with_text(
+                       severity = if_abap_behv_message=>severity-error
+                       text     = |Billing plan posting failed at step CREATE_CONSUMPTION_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                     )
+            ) TO reported-prepaymentupdates.
+
+          RETURN.
+        ENDIF.
 
         "--- Save new billing plan item ---
         lv_response_body = lo_response->get_text(  ).
@@ -979,15 +1172,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
           http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
-          "Debug
-          DATA(lv_body_debug7)   = lo_request->get_text( ).
-          DATA(lt_headers_debug7) = lo_request->get_header_fields( ).
-          DATA(lv_method_debug7) = lo_request->get_method( ).
-          DATA(lv_res_debug7) = lo_response->get_text( ).
-          DATA(lt_res_headers7) = lo_response->get_header_fields( ).
-          DATA(lv_path_debug7) = lo_request->get_header_field( i_name = '~request_uri' ).
+            lv_step_seq = lv_step_seq + 1.
+            zcl_prepay_log=>log_step(
+              iv_correlation_id = lv_log_id
+              iv_flow_type      = 'BILLPLAN'
+              iv_step_seq       = lv_step_seq
+              iv_step_name      = 'UPDATE_REMAINDER_LINE'
+              iv_http_method    = 'PATCH'
+              iv_http_status    = http_status
+              iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+              iv_response_body  = lo_response->get_text( ) ).
 
-          "end debug
+            IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+              zcl_prepay_log=>finish_process(
+                iv_log_id       = lv_log_id
+                iv_status       = 'E'
+                iv_message_text = |Step UPDATE_REMAINDER_LINE failed with HTTP { http_status }| ).
+
+              APPEND VALUE #(
+                  %tky = ls_key-%tky
+                  %msg = new_message_with_text(
+                           severity = if_abap_behv_message=>severity-error
+                           text     = |Billing plan posting failed at step UPDATE_REMAINDER_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                         )
+                ) TO reported-prepaymentupdates.
+
+              RETURN.
+            ENDIF.
         ELSEIF lv_remainder_line_item IS INITIAL AND lv_fully_consumed = abap_false.
           "--- ADD Remainder Line ---
 
@@ -1033,15 +1244,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
           http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
-          "Debug
-          DATA(lv_body_debug8)   = lo_request->get_text( ).
-          DATA(lt_headers_debug8) = lo_request->get_header_fields( ).
-          DATA(lv_method_debug8) = lo_request->get_method( ).
-          DATA(lv_res_debug8) = lo_response->get_text( ).
-          DATA(lt_res_headers8) = lo_response->get_header_fields( ).
-          DATA(lv_path_debug8) = lo_request->get_header_field( i_name = '~request_uri' ).
+          lv_step_seq = lv_step_seq + 1.
+            zcl_prepay_log=>log_step(
+              iv_correlation_id = lv_log_id
+              iv_flow_type      = 'BILLPLAN'
+              iv_step_seq       = lv_step_seq
+              iv_step_name      = 'CREATE_REMAINDER_LINE'
+              iv_http_method    = 'POST'
+              iv_http_status    = http_status
+              iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+              iv_response_body  = lo_response->get_text( ) ).
 
-          "end debug
+            IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+              zcl_prepay_log=>finish_process(
+                iv_log_id       = lv_log_id
+                iv_status       = 'E'
+                iv_message_text = |Step CREATE_REMAINDER_LINE failed with HTTP { http_status }| ).
+
+              APPEND VALUE #(
+                  %tky = ls_key-%tky
+                  %msg = new_message_with_text(
+                           severity = if_abap_behv_message=>severity-error
+                           text     = |Billing plan posting failed at step CREATE_REMAINDER_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                         )
+                ) TO reported-prepaymentupdates.
+
+              RETURN.
+            ENDIF.
         ELSEIF lv_remainder_line_item IS NOT INITIAL AND lv_fully_consumed = abap_true.
 
 
@@ -1075,6 +1304,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
 
                 http_status = lv_status = lo_response->get_header_field( '~status_code' ).
+
+                lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'UPDATE_TOTAL_APPLIED_LINE'
+                  iv_http_method    = 'PATCH'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
+
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step UPDATE_TOTAL_APPLIED_LINE failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step UPDATE_TOTAL_APPLIED_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
 
                 IF lv_difference_amt < lv_threshold_amt and lv_difference_amt > 0.
                     "--------------------- Add difference amount  -------------------------------------
@@ -1114,6 +1371,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
                     http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
+                    lv_step_seq = lv_step_seq + 1.
+                    zcl_prepay_log=>log_step(
+                      iv_correlation_id = lv_log_id
+                      iv_flow_type      = 'BILLPLAN'
+                      iv_step_seq       = lv_step_seq
+                      iv_step_name      = 'CREATE_DIFFERENCE_LINE'
+                      iv_http_method    = 'POST'
+                      iv_http_status    = http_status
+                      iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                      iv_response_body  = lo_response->get_text( ) ).
+
+                    IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                      zcl_prepay_log=>finish_process(
+                        iv_log_id       = lv_log_id
+                        iv_status       = 'E'
+                        iv_message_text = |Step CREATE_DIFFERENCE_LINE failed with HTTP { http_status }| ).
+
+                      APPEND VALUE #(
+                          %tky = ls_key-%tky
+                          %msg = new_message_with_text(
+                                   severity = if_abap_behv_message=>severity-error
+                                   text     = |Billing plan posting failed at step CREATE_DIFFERENCE_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                                 )
+                        ) TO reported-prepaymentupdates.
+
+                      RETURN.
+                    ENDIF.
+
                     "--- Save diff line billing plan item ---
 
                     lv_response_body = lo_response->get_text(  ).
@@ -1142,15 +1427,33 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
               http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
-              "Debug
-              DATA(lv_body_debug9)   = lo_request->get_text( ).
-              DATA(lt_headers_debug9) = lo_request->get_header_fields( ).
-              DATA(lv_method_debug9) = lo_request->get_method( ).
-              DATA(lv_res_debug9) = lo_response->get_text( ).
-              DATA(lt_res_headers9) = lo_response->get_header_fields( ).
-              DATA(lv_path_debug9) = lo_request->get_header_field( i_name = '~request_uri' ).
+                lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'DELETE_REMAINDER_LINE'
+                  iv_http_method    = 'DELETE'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
 
-              "end debug
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step DELETE_REMAINDER_LINE failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step DELETE_REMAINDER_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
 
                "--- END DELETE Remainder Line ---
 
@@ -1180,6 +1483,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
 
               http_status = lv_status = lo_response->get_header_field( '~status_code' ).
+
+              lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'UPDATE_BILLING_BLOCK'
+                  iv_http_method    = 'PATCH'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
+
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step UPDATE_BILLING_BLOCK failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step UPDATE_BILLING_BLOCK (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
           ENDIF.
 
 
@@ -1225,6 +1556,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
                 http_status = lv_status = lo_response->get_header_field( '~status_code' ).
 
+                lv_step_seq = lv_step_seq + 1.
+                zcl_prepay_log=>log_step(
+                  iv_correlation_id = lv_log_id
+                  iv_flow_type      = 'BILLPLAN'
+                  iv_step_seq       = lv_step_seq
+                  iv_step_name      = 'CREATE_TOTAL_APPLIED_LINE'
+                  iv_http_method    = 'POST'
+                  iv_http_status    = http_status
+                  iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                  iv_response_body  = lo_response->get_text( ) ).
+
+                IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                  zcl_prepay_log=>finish_process(
+                    iv_log_id       = lv_log_id
+                    iv_status       = 'E'
+                    iv_message_text = |Step CREATE_TOTAL_APPLIED_LINE failed with HTTP { http_status }| ).
+
+                  APPEND VALUE #(
+                      %tky = ls_key-%tky
+                      %msg = new_message_with_text(
+                               severity = if_abap_behv_message=>severity-error
+                               text     = |Billing plan posting failed at step CREATE_TOTAL_APPLIED_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                             )
+                    ) TO reported-prepaymentupdates.
+
+                  RETURN.
+                ENDIF.
+
                 IF lv_difference_amt < lv_threshold_amt and lv_difference_amt > 0.
                     "--------------------- Add difference amount  -------------------------------------
                     lo_request = lo_http_client->get_http_request( ).
@@ -1262,6 +1621,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
 
                     http_status = lv_status = lo_response->get_header_field( '~status_code' ).
+
+                    lv_step_seq = lv_step_seq + 1.
+                    zcl_prepay_log=>log_step(
+                      iv_correlation_id = lv_log_id
+                      iv_flow_type      = 'BILLPLAN'
+                      iv_step_seq       = lv_step_seq
+                      iv_step_name      = 'CREATE_DIFFERENCE_LINE'
+                      iv_http_method    = 'POST'
+                      iv_http_status    = http_status
+                      iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+                      iv_response_body  = lo_response->get_text( ) ).
+
+                    IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+                      zcl_prepay_log=>finish_process(
+                        iv_log_id       = lv_log_id
+                        iv_status       = 'E'
+                        iv_message_text = |Step CREATE_DIFFERENCE_LINE failed with HTTP { http_status }| ).
+
+                      APPEND VALUE #(
+                          %tky = ls_key-%tky
+                          %msg = new_message_with_text(
+                                   severity = if_abap_behv_message=>severity-error
+                                   text     = |Billing plan posting failed at step CREATE_DIFFERENCE_LINE (HTTP { http_status }). Ref: { lv_log_id }|
+                                 )
+                        ) TO reported-prepaymentupdates.
+
+                      RETURN.
+                    ENDIF.
                     lv_response_body = lo_response->get_text(  ).
                     IF lo_response->get_status( )-code = '201' AND lv_response_body IS NOT INITIAL.
                       lv_diff_line_item = substring_before( val = substring_after( val = lv_response_body
@@ -1297,6 +1684,34 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
 
 
               http_status = lv_status = lo_response->get_header_field( '~status_code' ).
+
+              lv_step_seq = lv_step_seq + 1.
+            zcl_prepay_log=>log_step(
+              iv_correlation_id = lv_log_id
+              iv_flow_type      = 'BILLPLAN'
+              iv_step_seq       = lv_step_seq
+              iv_step_name      = 'UPDATE_BILLING_BLOCK'
+              iv_http_method    = 'PATCH'
+              iv_http_status    = http_status
+              iv_uri            = lo_request->get_header_field( i_name = '~request_uri' )
+              iv_response_body  = lo_response->get_text( ) ).
+
+            IF CONV i( http_status ) < 200 OR CONV i( http_status ) >= 300.
+              zcl_prepay_log=>finish_process(
+                iv_log_id       = lv_log_id
+                iv_status       = 'E'
+                iv_message_text = |Step UPDATE_BILLING_BLOCK failed with HTTP { http_status }| ).
+
+              APPEND VALUE #(
+                  %tky = ls_key-%tky
+                  %msg = new_message_with_text(
+                           severity = if_abap_behv_message=>severity-error
+                           text     = |Billing plan posting failed at step UPDATE_BILLING_BLOCK (HTTP { http_status }). Ref: { lv_log_id }|
+                         )
+                ) TO reported-prepaymentupdates.
+
+              RETURN.
+            ENDIF.
           ENDIF.
 
 
@@ -1307,6 +1722,10 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
         DATA ls_type_result TYPE zi_Prepayment_Updates.
         ls_type_result-prepaymentsoitem = |{ lv_billing_plan_item }{ COND string( WHEN lv_diff_line_item IS NOT INITIAL THEN |#{ lv_diff_line_item }| ) }|.
 
+        zcl_prepay_log=>finish_process(
+          iv_log_id = lv_log_id
+          iv_status = 'S' ).
+
         LOOP AT keys INTO DATA(ls_key_res).
 
           APPEND VALUE #( %tky = ls_key_res-%tky
@@ -1315,10 +1734,36 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
         ENDLOOP.
       CATCH cx_http_dest_provider_error
             cx_web_http_client_error INTO DATA(lo_http_error1).
-        rv_result = |API1 failed: { lo_http_error1->get_text( ) }\n\n|.
+        zcl_prepay_log=>finish_process(
+          iv_log_id       = lv_log_id
+          iv_status       = 'E'
+          iv_message_text = lo_http_error1->get_text( ) ).
+
+        LOOP AT keys INTO DATA(ls_key_err1).
+          APPEND VALUE #(
+              %tky = ls_key_err1-%tky
+              %msg = new_message_with_text(
+                       severity = if_abap_behv_message=>severity-error
+                       text     = |Sales order communication failed: { lo_http_error1->get_text( ) } (ref: { lv_log_id })|
+                     )
+            ) TO reported-prepaymentupdates.
+        ENDLOOP.
 
       CATCH cx_root INTO DATA(lo_unexpected1).
-        rv_result = |API1 unexpected error: { lo_unexpected1->get_text( ) }\n\n|.
+        zcl_prepay_log=>finish_process(
+          iv_log_id       = lv_log_id
+          iv_status       = 'E'
+          iv_message_text = lo_unexpected1->get_text( ) ).
+
+        LOOP AT keys INTO DATA(ls_key_err2).
+          APPEND VALUE #(
+              %tky = ls_key_err2-%tky
+              %msg = new_message_with_text(
+                       severity = if_abap_behv_message=>severity-error
+                       text     = |Unexpected error posting billing plan: { lo_unexpected1->get_text( ) } (ref: { lv_log_id })|
+                     )
+            ) TO reported-prepaymentupdates.
+        ENDLOOP.
     ENDTRY.
 
 

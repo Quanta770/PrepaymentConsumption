@@ -37,11 +37,6 @@ define root view entity ZC_PREPAY_PROCESS_LOG
       @UI.hidden: true
   key LogId,
 
-      @EndUserText.label: 'Flow Type'
-      @UI.lineItem:       [ { position: 10, importance: #HIGH } ]
-      @UI.selectionField: [ { position: 10 } ]
-      @UI.identification: [ { position: 10 } ]
-      FlowType,
 
       @EndUserText.label: 'Logged At'
       @UI.lineItem:       [ { position: 20, importance: #HIGH } ]

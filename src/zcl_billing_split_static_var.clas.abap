@@ -7,9 +7,9 @@
         CLASS-DATA: mv_shared_value TYPE string.
       PROTECTED SECTION.
       PRIVATE SECTION.
-    ENDCLASS.
+ENDCLASS.
 
 
 
-    CLASS zcl_billing_split_static_var IMPLEMENTATION.
-    ENDCLASS.
+CLASS ZCL_BILLING_SPLIT_STATIC_VAR IMPLEMENTATION.
+ENDCLASS.
