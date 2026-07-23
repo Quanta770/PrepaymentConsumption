@@ -13,6 +13,7 @@ CLASS zcl_prepay_log DEFINITION
         iv_prepayment_so      TYPE string OPTIONAL
         iv_prepayment_so_item TYPE string OPTIONAL
         iv_company_code       TYPE string OPTIONAL
+        iv_client_process_id  TYPE sysuuid_c32 OPTIONAL
       RETURNING VALUE(rv_log_id) TYPE sysuuid_c32.
 
     CLASS-METHODS log_step
@@ -33,7 +34,8 @@ CLASS zcl_prepay_log DEFINITION
         iv_status               TYPE string
         iv_message_text         TYPE string OPTIONAL
         iv_accounting_document  TYPE string OPTIONAL
-        iv_fiscal_year          TYPE string OPTIONAL.
+        iv_fiscal_year          TYPE string OPTIONAL
+        iv_commit                TYPE abap_bool OPTIONAL.
 
 ENDCLASS.
 
@@ -47,6 +49,10 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
     TRY.
         DATA(lv_log_id) = cl_uuid_factory=>create_system_uuid( )->create_uuid_c32( ).
 
+        DATA(lv_client_process_id) = COND sysuuid_c32( WHEN iv_client_process_id IS NOT INITIAL
+                                                        THEN iv_client_process_id
+                                                        ELSE lv_log_id ).
+
         DATA ls_log TYPE ztb_prepay_log.
         ls_log-log_id             = lv_log_id.
         ls_log-correlation_id     = lv_log_id.
@@ -57,6 +63,7 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
         ls_log-prepayment_so      = iv_prepayment_so.
         ls_log-prepayment_so_item = iv_prepayment_so_item.
         ls_log-company_code       = iv_company_code.
+        ls_log-client_process_id  = lv_client_process_id.
 
         GET TIME STAMP FIELD ls_log-logged_at.
         ls_log-logged_by = cl_abap_context_info=>get_user_technical_name( ).
@@ -76,6 +83,7 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
                              PrepaymentSo    = iv_prepayment_so
                              PrepaymentSoItem = iv_prepayment_so_item
                              CompanyCode     = iv_company_code
+                             ClientProcessId = lv_client_process_id
                              LoggedAt        = ls_log-logged_at
                              LoggedBy        = cl_abap_context_info=>get_user_technical_name( ) ) )
           FAILED   DATA(ls_failed)
@@ -170,6 +178,14 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
                              FiscalYear         = iv_fiscal_year ) )
           FAILED   DATA(ls_failed)
           REPORTED DATA(ls_reported).
+
+       IF iv_commit = abap_true.
+          COMMIT ENTITIES BEGIN
+            RESPONSE OF zi_prepay_log_write
+            FAILED   DATA(ls_commit_failed)
+            REPORTED DATA(ls_commit_reported).
+          COMMIT ENTITIES END.
+        ENDIF.
 
       CATCH cx_root.
         " Logging must never break the actual business action.

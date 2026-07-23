@@ -24,4 +24,5 @@ define custom entity ZI_PREPAYPOST_CUSTOM_ENT
   AccountingDocument   : abap.char(10);
   Status             : abap.char(10);
   Remarks              : abap.char(512);
+  clientprocessid : abap.char(32);
 }

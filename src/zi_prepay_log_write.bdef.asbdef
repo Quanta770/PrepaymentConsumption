@@ -29,7 +29,7 @@ authorization master ( instance )
       PrepaymentSo       = prepayment_so;
       PrepaymentSoItem   = prepayment_so_item;
       CompanyCode        = company_code;
-//      ClientProcessId    = client_process_id;
+      ClientProcessId    = client_process_id;
       AccountingDocument = accounting_document;
       FiscalYear         = fiscal_year;
       LoggedAt           = logged_at;

@@ -4,6 +4,7 @@
 define view entity ZI_PREPAY_PROCESS_STEP
   as select from ztb_prepay_log
   association to parent ZI_PREPAY_PROCESS_LOG as _parent on $projection.CorrelationId = _parent.LogId
+
 {
   key log_id        as LogId,
       correlation_id as CorrelationId,
@@ -16,3 +17,4 @@ define view entity ZI_PREPAY_PROCESS_STEP
       
       _parent
 }
+  where step_seq > '00'

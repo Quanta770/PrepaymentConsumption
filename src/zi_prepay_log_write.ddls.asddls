@@ -19,7 +19,7 @@ define root view entity ZI_PREPAY_LOG_WRITE
       prepayment_so        as PrepaymentSo,
       prepayment_so_item   as PrepaymentSoItem,
       company_code         as CompanyCode,
-//      client_process_id    as ClientProcessId,
+      client_process_id    as ClientProcessId,
       accounting_document  as AccountingDocument,
       fiscal_year          as FiscalYear,
       logged_at            as LoggedAt,

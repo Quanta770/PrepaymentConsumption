@@ -354,7 +354,8 @@ CLASS lhc_PrepaymentUpdates IMPLEMENTATION.
       iv_delivery_so        = so_number
       iv_delivery_so_item   = so_item
       iv_prepayment_so      = lv_prepay_so
-      iv_prepayment_so_item = lv_prepay_so_item ).
+      iv_prepayment_so_item = lv_prepay_so_item
+      iv_client_process_id  = ls_key-%param-param_log_id  ).
     DATA lv_step_seq TYPE i VALUE 0.
 
     DATA lv_status     TYPE i.

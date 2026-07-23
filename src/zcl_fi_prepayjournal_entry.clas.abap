@@ -259,6 +259,17 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
     DATA(lv_writeoff) = VALUE #( it_filters[ name = 'SOLDTO' ]-range[ 1 ]-low OPTIONAL ).
     " End of Addition
 
+    DATA(lv_client_process_id) = VALUE sysuuid_c32( it_filters[ name = 'CLIENTPROCESSID' ]-range[ 1 ]-low OPTIONAL ).
+
+    DATA(lv_log_id) = zcl_prepay_log=>start_process(
+      iv_flow_type          = 'JEPOST'
+      iv_delivery_so        = lv_DlvOrder
+      iv_delivery_so_item   = lv_DlvOrderItem
+      iv_prepayment_so      = lv_PreOrder
+      iv_prepayment_so_item = lv_PreOrderItem
+      iv_client_process_id  = lv_client_process_id ).
+    DATA lv_je_step_seq TYPE i VALUE 0.
+
     SELECT DISTINCT
            zc_prepayment_delivery_so~prepaymentreqnumprepayment AS prepaymentrequest,
            zc_prepayment_delivery_so~prepaymentso AS salesorder,
@@ -283,9 +294,17 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
         INTO TABLE @DATA(lt_data_prepay).
 
     IF lt_data_prepay IS INITIAL.
+      DATA(lv_no_prepay_msg) = |No prepayment data found for SO { lv_PreOrder ALPHA = OUT } item { lv_PreOrderItem ALPHA = OUT }|.
+
+      zcl_prepay_log=>finish_process(
+        iv_log_id       = lv_log_id
+        iv_status       = 'E'
+        iv_message_text = lv_no_prepay_msg
+        iv_commit       = abap_true ).
+
       APPEND VALUE #(
         Status  = 'ERROR'
-        Message = |No prepayment data found for SO { lv_PreOrder ALPHA = OUT } item { lv_PreOrderItem ALPHA = OUT }|
+        Message = lv_no_prepay_msg
       ) TO rt_result.
       RETURN.
     ENDIF.
@@ -313,9 +332,17 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
            AND delvsosalesdocumentitem = @lv_DlvOrderItem
         INTO TABLE @DATA(lt_data_DelvSo).
      IF lt_data_DelvSo IS INITIAL.
+        DATA(lv_no_delvso_msg) = |No delivery SO data found for SO { lv_DlvOrder ALPHA = OUT } item { lv_DlvOrderItem ALPHA = OUT }|.
+
+        zcl_prepay_log=>finish_process(
+          iv_log_id       = lv_log_id
+          iv_status       = 'E'
+          iv_message_text = lv_no_delvso_msg
+          iv_commit       = abap_true ).
+
         APPEND VALUE #(
           Status  = 'ERROR'
-          Message = |No delivery SO data found for SO { lv_DlvOrder ALPHA = OUT } item { lv_DlvOrderItem ALPHA = OUT }|
+          Message = lv_no_delvso_msg
         ) TO rt_result.
         RETURN.
       ENDIF.
@@ -1014,6 +1041,16 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
           ENDIF.
         ENDLOOP.
 
+        DATA(lv_modify_err_msg) = COND string( WHEN lv_all_messages IS NOT INITIAL
+                                               THEN lv_all_messages
+                                               ELSE 'Journal entry validation failed before commit' ).
+
+        zcl_prepay_log=>finish_process(
+          iv_log_id       = lv_log_id
+          iv_status       = 'E'
+          iv_message_text = lv_modify_err_msg
+          iv_commit       = abap_true ).
+
         APPEND VALUE #(
           Status  = 'ERROR'
           Message = COND #( WHEN lv_all_messages IS NOT INITIAL
@@ -1043,6 +1080,16 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
           ENDIF.
         ENDLOOP.
 
+        DATA(lv_commit_err_msg) = COND string( WHEN lv_all_messages IS NOT INITIAL
+                                               THEN lv_all_messages
+                                               ELSE 'Commit failed without detailed message' ).
+
+        zcl_prepay_log=>finish_process(
+          iv_log_id       = lv_log_id
+          iv_status       = 'E'
+          iv_message_text = lv_commit_err_msg
+          iv_commit       = abap_true ).
+
         APPEND VALUE #(
           Status  = 'ERROR'
           Message = COND #( WHEN lv_all_messages IS NOT INITIAL
@@ -1055,12 +1102,28 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
       " ── Success: read the created document from MAPPED, not REPORTED ──────
       LOOP AT lt_commit_reported-journalentry INTO DATA(ls_je).
         IF ls_je-AccountingDocument IS NOT INITIAL.
+
+
+          zcl_prepay_log=>finish_process(
+            iv_log_id              = lv_log_id
+            iv_status              = 'S'
+            iv_accounting_document = CONV string( ls_je-AccountingDocument )
+            iv_fiscal_year = CONV string( ls_je-FiscalYear )
+            iv_commit       = abap_true ).
+
           APPEND VALUE #(
             AccountingDocument = ls_je-AccountingDocument
             Status             = 'SUCCESS'
             Message            = ''
           ) TO rt_result.
         ELSE.
+
+          zcl_prepay_log=>finish_process(
+            iv_log_id       = lv_log_id
+            iv_status       = 'E'
+            iv_message_text = 'Commit reported no accounting document number'
+            iv_commit       = abap_true ).
+
           APPEND VALUE #(
             Status  = 'ERROR'
             Message = 'Commit reported no accounting document number'
@@ -1070,6 +1133,12 @@ CLASS ZCL_FI_PREPAYJOURNAL_ENTRY IMPLEMENTATION.
 
       " ── Safety net: MAPPED empty but no failure flagged ──────────────────
       IF rt_result IS INITIAL.
+        zcl_prepay_log=>finish_process(
+          iv_log_id       = lv_log_id
+          iv_status       = 'E'
+          iv_message_text = 'No accounting document produced by posting'
+          iv_commit       = abap_true ).
+
         APPEND VALUE #(
           Status  = 'ERROR'
           Message = 'No accounting document produced by posting'

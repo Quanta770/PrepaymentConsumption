@@ -6,6 +6,7 @@ define root view entity ZI_PREPAY_PROCESS_LOG
   composition [1..*] of ZI_PREPAY_PROCESS_STEP as _ProcessStep
 {
   key log_id                     as LogId,
+      client_process_id as ClientProcessId,
       flow_type                  as FlowType,
       logged_at                  as LoggedAt,
       logged_by                  as LoggedBy,
@@ -39,6 +40,7 @@ define root view entity ZI_PREPAY_PROCESS_LOG
 }
 group by
   log_id,
+  client_process_id,
   flow_type,
   logged_at,
   logged_by,
