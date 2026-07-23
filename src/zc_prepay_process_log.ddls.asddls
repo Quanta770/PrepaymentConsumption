@@ -31,11 +31,22 @@ define root view entity ZC_PREPAY_PROCESS_LOG
         { id: 'HttpStepTable', purpose: #STANDARD, type: #LINEITEM_REFERENCE,
           label: 'Billing Plan HTTP Steps', targetElement: '_ProcessStep', position: 30 },
         { id: 'JePosting', purpose: #STANDARD, type: #FIELDGROUP_REFERENCE,
-          label: 'JE Posting Result',      targetQualifier: 'JePosting', position: 40 }
+          label: 'JE Posting Result',      targetQualifier: 'JePosting', position: 40 },
+        { id: 'RelatedRun', purpose: #STANDARD, type: #LINEITEM_REFERENCE,
+          label: 'Related Run (Billing Plan / Journal Entry)', targetElement: '_RelatedRun', position: 50 }
       ]
 
       @UI.hidden: true
   key LogId,
+  
+      @UI.hidden: true
+      ClientProcessId,
+  
+      @EndUserText.label: 'Flow Type'
+      @UI.lineItem:       [ { position: 10, importance: #HIGH } ]
+      @UI.selectionField: [ { position: 10 } ]
+      @UI.identification: [ { position: 10 } ]
+      FlowType,
 
 
       @EndUserText.label: 'Logged At'
@@ -60,6 +71,7 @@ define root view entity ZC_PREPAY_PROCESS_LOG
       @UI.lineItem:       [ { position: 40, importance: #HIGH } ]
       @UI.multiLineText: true
       @UI.dataPoint:      { qualifier: 'MsgDP', title: 'Message' }
+      @UI.fieldGroup:     [ { qualifier: 'JePosting', position: 30 } ]
       @Search.defaultSearchElement: true
       @Search.fuzzinessThreshold: 0.8
       MessageText,
@@ -100,6 +112,7 @@ define root view entity ZC_PREPAY_PROCESS_LOG
       FiscalYear,
 
       _ProcessStep : redirected to composition child ZC_PREPAY_PROCESS_STEP,
+      _RelatedRun : redirected to ZC_PREPAY_PROCESS_LOG,
 
       @UI.hidden: true
       StatusCriticality,

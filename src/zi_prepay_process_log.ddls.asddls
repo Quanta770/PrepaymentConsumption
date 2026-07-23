@@ -4,6 +4,9 @@
 define root view entity ZI_PREPAY_PROCESS_LOG
   as select from ztb_prepay_log
   composition [1..*] of ZI_PREPAY_PROCESS_STEP as _ProcessStep
+  association [0..*] to ZI_PREPAY_PROCESS_LOG as _RelatedRun
+    on  $projection.ClientProcessId = _RelatedRun.ClientProcessId
+    and $projection.FlowType       <> _RelatedRun.FlowType
 {
   key log_id                     as LogId,
       client_process_id as ClientProcessId,
@@ -36,8 +39,12 @@ define root view entity ZI_PREPAY_PROCESS_LOG
           else ''
         end as abap.char( 20 ) ) as StatusText,
 
-      _ProcessStep
+      _ProcessStep,
+      _RelatedRun
 }
+
+where step_seq = '00'
+
 group by
   log_id,
   client_process_id,

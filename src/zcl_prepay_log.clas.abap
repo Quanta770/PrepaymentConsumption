@@ -71,7 +71,7 @@ CLASS ZCL_PREPAY_LOG IMPLEMENTATION.
         MODIFY ENTITIES OF zi_prepay_log_write
           ENTITY PrepayLogWrite
             CREATE FIELDS ( LogId CorrelationId FlowType Status DeliverySo DeliverySoItem
-                             PrepaymentSo PrepaymentSoItem CompanyCode
+                             PrepaymentSo PrepaymentSoItem CompanyCode ClientProcessId
                              LoggedAt LoggedBy )
             WITH VALUE #( ( %cid            = 'PREPAYLOGSTART'
                              LogId           = lv_log_id

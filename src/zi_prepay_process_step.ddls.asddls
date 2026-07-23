@@ -17,4 +17,4 @@ define view entity ZI_PREPAY_PROCESS_STEP
       
       _parent
 }
-  where step_seq > '00'
+//  where step_seq > '00'
